@@ -1,0 +1,66 @@
+================================================================================
+RANGKUMAN: TOOL & SISTEM KOMUNIKASI SUARA (VOICE AI, STT, TTS)
+================================================================================
+
+1. KOMUNIKASI SUARA DI HERMES AGENT
+--------------------------------------------------------------------------------
+Hermes Agent mendukung komunikasi suara dua arah secara langsung via modul STT dan TTS:
+- STT (Speech-to-Text): Menerima voice note/audio dan mentranskripsi ke teks secara otomatis (menggunakan local Faster-Whisper, Groq, atau OpenAI Whisper).
+- TTS (Text-to-Speech): Menghasilkan respons suara (format audio .mp3 di CLI atau voice bubble di Telegram/WhatsApp). Provider bawaan yang direkomendasikan adalah Edge TTS (gratis, tanpa API key, mendukung suara Bahasa Indonesia alami seperti id-ID-ArdiNeural / id-ID-GadisNeural).
+
+Perintah In-Session (/voice):
+- /voice on   : Mode voice-to-voice (voice dibalas voice, teks dibalas teks).
+- /voice tts  : Mode always voice (selalu membalas dengan audio).
+- /voice off  : Nonaktifkan mode suara (kembali ke teks murni).
+
+Konfigurasi CLI:
+- hermes config set tts.provider edge
+- hermes config set tts.voice id-ID-ArdiNeural
+- hermes config set stt.enabled true
+- hermes config set stt.provider groq (atau 'local' untuk offline)
+
+
+2. FRAMEWORK VOICE AI AGENT DI GITHUB (FULL PIPELINE / PRODUCTION-READY)
+--------------------------------------------------------------------------------
+* LiveKit Agents
+  - URL: https://github.com/livekit/agents
+  - Deskripsi: Framework paling populer untuk membuat voice AI agent real-time dengan WebRTC. Mendukung turn-detection, VAD (Voice Activity Detection), function calling, integrasi MCP server, serta orkestrasi model STT/TTS (Deepgram, OpenAI Realtime, Cartesia, ElevenLabs).
+
+* Pipecat
+  - URL: https://github.com/pipecat-ai/pipecat
+  - Deskripsi: Framework Python open-source berbasis pipeline audio-stream untuk conversational AI multimodal. Sangat fleksibel menghubungkan input audio (mikrofon/telepon/WebRTC) dengan berbagai LLM, STT, dan TTS.
+
+* Bolna
+  - URL: https://github.com/bolna-ai/bolna
+  - Deskripsi: Platform open-source untuk membangun AI voice agent dengan konfigurasi JSON/Python, mendukung integrasi telepon (Twilio/Plivo) serta audio lokal/WebSocket.
+
+* Vocode Core
+  - URL: https://github.com/vocodedev/vocode-core
+  - Deskripsi: Library open-source untuk membangun percakapan suara real-time berbasis LLM dengan kemampuan interruption handling (memotong pembicaraan saat user berbicara).
+
+* TEN Framework
+  - URL: https://github.com/TEN-framework/ten-framework
+  - Deskripsi: Framework real-time multimodal conversational voice AI dari Agora yang mendukung suara, video, VAD, dan integrasi tool calling.
+
+
+3. NATIVE SPEECH-TO-SPEECH FOUNDATION MODEL
+--------------------------------------------------------------------------------
+* Moshi (Kyutai Labs)
+  - URL: https://github.com/kyutai-labs/moshi
+  - Deskripsi: Foundation model speech-text native end-to-end (bukan pipeline terpisah STT -> LLM -> TTS). Memproses input dan output audio secara simultan (full-duplex) dengan latensi ultra-rendah (~200ms) dan interupsi alami.
+
+
+4. KOMPONEN SUARA LOKAL / PYTHON SCRIPTING
+--------------------------------------------------------------------------------
+* RealtimeSTT
+  - URL: https://github.com/KoljaB/RealtimeSTT
+  - Deskripsi: Library Python untuk Speech-to-Text streaming real-time dengan wake-word dan deteksi jeda bicara (VAD) otomatis.
+
+* RealtimeTTS
+  - URL: https://github.com/KoljaB/RealtimeTTS
+  - Deskripsi: Library Python untuk streaming Text-to-Speech dengan latensi minimal (mendukung Edge TTS, Coqui, OpenAI, dll).
+
+* Kokoro
+  - URL: https://github.com/hexgrad/kokoro
+  - Deskripsi: Model Text-to-Speech open-weight 82M yang sangat ringan, cepat, dan berkualitas tinggi untuk inferensi lokal pada CPU/GPU.
+================================================================================

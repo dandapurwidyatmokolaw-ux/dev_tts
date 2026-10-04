@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Terminal Controller & Anti-Loop Mic</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes wave-bar {
+      0%, 100% { height: 6px; }
+      50% { height: 28px; }
+    }
+    .wave-anim-1 { animation: wave-bar 0.9s infinite ease-in-out; }
+    .wave-anim-2 { animation: wave-bar 0.9s infinite ease-in-out 0.15s; }
+    .wave-anim-3 { animation: wave-bar 0.9s infinite ease-in-out 0.3s; }
+    .wave-anim-4 { animation: wave-bar 0.9s infinite ease-in-out 0.1s; }
+    .wave-anim-5 { animation: wave-bar 0.9s infinite ease-in-out 0.25s; }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.18); opacity: 0.15; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .ring-active { animation: pulse-ring 1.6s infinite ease-in-out; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex items-center justify-center min-h-screen p-3 sm:p-5 font-sans select-none">
+
+  <!-- Main Container -->
+  <div class="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
+    
+    <!-- Top Decorative Glow -->
+    <div class="absolute -top-24 -left-24 w-52 h-52 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-24 -right-24 w-52 h-52 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+    <!-- Top Action Bar (Header + Emergency Stop Buttons) -->
+    <div class="flex items-center justify-between border-b border-slate-800/80 pb-4 mb-5">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-emerald-400 text-slate-950 flex items-center justify-center font-bold text-lg shadow-md shadow-cyan-500/20">
+          🎙️
+        </div>
+        <div>
+          <h1 class="text-sm font-bold text-slate-100 leading-tight">Terminal Voice Chat</h1>
+          <p class="text-[11px] text-slate-400">Web Controller & Mic Bridge</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons: Stop Suara & Matikan Aplikasi -->
+      <div class="flex items-center gap-2">
+        <button id="stopAudioBtn" title="Hentikan audio TTS yang sedang berbunyi" class="flex items-center gap-1.5 bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 border border-amber-500/40 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer">
+          <span>⏹️</span>
+          <span class="hidden sm:inline">Stop Suara</span>
+        </button>
+
+        <button id="stopAppBtn" title="Matikan seluruh aplikasi dan proses terminal" class="flex items-center gap-1.5 bg-rose-600/20 hover:bg-rose-600/35 active:scale-95 text-rose-300 border border-rose-500/50 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer">
+          <span>🛑</span>
+          <span>Stop Aplikasi</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TERMINAL DISPLAY BOX (Persis gaya text.png) -->
+    <div class="mb-5 bg-[#181825] border border-slate-700/80 rounded-2xl p-3.5 sm:p-4 font-mono shadow-inner text-xs">
+      
+      <!-- Top Status Bar (seperti Hermes CLI di text.png) -->
+      <div class="flex items-center justify-between text-[11px] text-amber-300/90 pb-2 mb-2 border-b border-slate-700/60 overflow-x-auto whitespace-nowrap">
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400">☤</span>
+          <span class="font-bold text-yellow-300">gemini-3.8-flash-low</span>
+          <span class="text-slate-500">|</span>
+          <span class="text-slate-300">~29.3K/1M [░░░░] ~3%</span>
+        </div>
+        <div class="flex items-center gap-2 text-slate-400">
+          <span class="text-yellow-400">◎ 62.1%</span>
+          <span class="text-slate-500">|</span>
+          <span class="text-emerald-400 font-bold">$ 0.00</span>
+        </div>
+      </div>
+
+      <!-- Prompt Input Box (Border Peach/Salmon seperti di text.png) -->
+      <div class="border-t border-b border-rose-400/80 py-2.5 my-2.5 px-2 bg-slate-950/40 rounded-sm">
+        <div class="flex items-start gap-2">
+          <span class="text-cyan-400 font-bold select-none">&gt;</span>
+          <div class="flex-1">
+            <span id="promptSource" class="text-slate-400 font-semibold">[VOICE]</span>
+            <span id="promptText" class="text-amber-200 italic font-medium ml-1">What changed in this repo recently?</span>
+            <span id="terminalCursor" class="inline-block w-2 h-3.5 bg-cyan-400 align-middle ml-0.5 animate-pulse"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Agent Streaming Response Box -->
+      <div class="mt-2 text-slate-200 min-h-[48px] max-h-48 overflow-y-auto pr-1">
+        <div class="flex items-start gap-1.5 leading-relaxed">
+          <span class="text-emerald-400 font-bold select-none whitespace-nowrap">Agent :</span>
+          <span id="agentText" class="text-slate-100 whitespace-pre-wrap font-sans text-xs">Jawaban AI akan tercetak secara streaming di sini dan di layar terminal Anda...</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Center Mic Controller -->
+    <div class="flex flex-col items-center justify-center my-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+      
+      <!-- Big Mic Circular Button -->
+      <div class="relative">
+        <div id="pulseRing" class="hidden absolute inset-0 rounded-full bg-red-500 ring-active"></div>
+        <button id="toggleVoiceBtn" class="relative w-24 h-24 rounded-full bg-gradient-to-tr from-cyan-500 to-emerald-400 hover:from-cyan-400 hover:to-emerald-300 text-slate-950 font-bold flex flex-col items-center justify-center shadow-xl shadow-cyan-500/25 transition transform active:scale-95 cursor-pointer">
+          <span id="btnIcon" class="text-3xl">🎙️</span>
+          <span id="btnSub" class="text-[10px] tracking-wider uppercase font-black mt-1">START</span>
+        </button>
+      </div>
+
+      <!-- Status Indicator Text -->
+      <div id="statusLabel" class="text-xs font-medium text-slate-400 mt-3.5 flex items-center gap-2 text-center">
+        <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+        <span>Mode Suara Standby - Klik START untuk bicara</span>
+      </div>
+
+      <!-- Audio Waveform (Visible when mic active) -->
+      <div id="waveform" class="hidden flex items-center gap-1.5 h-6 mt-2">
+        <span class="w-1 bg-emerald-400 rounded-full wave-anim-1"></span>
+        <span class="w-1 bg-emerald-400 rounded-full wave-anim-2"></span>
+        <span class="w-1 bg-emerald-400 rounded-full wave-anim-3"></span>
+        <span class="w-1 bg-emerald-400 rounded-full wave-anim-4"></span>
+        <span class="w-1 bg-emerald-400 rounded-full wave-anim-5"></span>
+      </div>
+
+      <!-- Live Transcribe Preview -->
+      <div class="w-full mt-3 pt-2.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
+        <span class="truncate max-w-[280px]" id="previewText">Ucapkan pertanyaan Anda ke mikrofon...</span>
+        <span id="sendBadge" class="hidden bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded text-[10px] font-mono">Terkirim ✓</span>
+      </div>
+
+    </div>
+
+    <!-- Settings Controls (Voice, Engine, & Mic Mode) -->
+    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950/40 p-3.5 rounded-2xl border border-slate-800/60">
+      
+      <!-- Engine TTS -->
+      <div>
+        <label class="block text-[11px] font-medium text-slate-400 mb-1">Mesin Suara (TTS):</label>
+        <select id="engineSelect" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500 transition cursor-pointer">
+          <option value="edge" selected>Edge-TTS (Alami Bahasa Indonesia)</option>
+          <option value="f5">F5-TTS (SWivid/F5-TTS - Voice Clone GPU)</option>
+          <option value="kokoro">Kokoro-82M (Lokal GPU RTX - English)</option>
+        </select>
+      </div>
+
+      <!-- Voice Selector -->
+      <div>
+        <label class="block text-[11px] font-medium text-slate-400 mb-1">Pilihan Suara (Voice):</label>
+        <select id="voiceSelect" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500 transition cursor-pointer">
+          <!-- Dynamically populated -->
+        </select>
+      </div>
+
+      <!-- STT Language -->
+      <div>
+        <label class="block text-[11px] font-medium text-slate-400 mb-1">Bahasa Mic (STT):</label>
+        <select id="langSelect" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-cyan-500 transition cursor-pointer">
+          <option value="id-ID" selected>Bahasa Indonesia (id-ID)</option>
+          <option value="en-US">English (en-US)</option>
+        </select>
+      </div>
+
+      <!-- Mode Mic Toggle (Otomatis vs Tahan Bicara) -->
+      <div>
+        <label class="block text-[11px] font-medium text-slate-400 mb-1">Metode Bicara:</label>
+        <div class="flex items-center gap-1 bg-slate-800 p-0.5 rounded-xl text-xs h-[34px]">
+          <button id="modeAutoBtn" class="flex-1 py-1 rounded-lg bg-cyan-500 text-slate-950 font-bold transition">Otomatis</button>
+          <button id="modePttBtn" class="flex-1 py-1 rounded-lg text-slate-400 hover:text-slate-200 font-medium transition">Tahan Bicara</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer Notice -->
+    <div class="mt-4 text-center text-[10px] text-slate-500">
+      💡 Suara TTS diputar otomatis ke speaker Windows & teks percakapan tersinkronisasi di terminal CLI.
+    </div>
+
+  </div>
+
+  <script>
+    let isListening = false;
+    let isPushToTalk = false;
+    let isAgentSpeaking = false;
+    let recognition = null;
+    let voicesData = {};
+    let silenceTimer = null;
+    let pollAudioTimer = null;
+    let accumulatedText = "";
+    let lastSentText = "";
+
+    // DOM Elements
+    const engineSelect = document.getElementById("engineSelect");
+    const voiceSelect = document.getElementById("voiceSelect");
+    const langSelect = document.getElementById("langSelect");
+    const modeAutoBtn = document.getElementById("modeAutoBtn");
+    const modePttBtn = document.getElementById("modePttBtn");
+    const toggleVoiceBtn = document.getElementById("toggleVoiceBtn");
+    const btnIcon = document.getElementById("btnIcon");
+    const btnSub = document.getElementById("btnSub");
+    const pulseRing = document.getElementById("pulseRing");
+    const statusLabel = document.getElementById("statusLabel");
+    const waveform = document.getElementById("waveform");
+    const previewText = document.getElementById("previewText");
+    const sendBadge = document.getElementById("sendBadge");
+    const stopAudioBtn = document.getElementById("stopAudioBtn");
+    const stopAppBtn = document.getElementById("stopAppBtn");
+
+    // Terminal DOM Elements (Mirip text.png)
+    const promptText = document.getElementById("promptText");
+    const promptSource = document.getElementById("promptSource");
+    const agentText = document.getElementById("agentText");
+
+    // Inisialisasi Suara & Konfigurasi
+    async function initConfig() {
+      try {
+        const res = await fetch("/api/config");
+        const data = await res.json();
+        voicesData = data.voices;
+        populateVoices(engineSelect.value);
+      } catch (e) {
+        console.error("Config error:", e);
+      }
+    }
+
+    function populateVoices(engine) {
+      voiceSelect.innerHTML = "";
+      const list = voicesData[engine] || [];
+      list.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v;
+        if (v === "id-ID-GadisNeural") opt.textContent = "Gadis (Wanita Indonesia - Alami)";
+        else if (v === "id-ID-ArdiNeural") opt.textContent = "Ardi (Pria Indonesia - Alami)";
+        else if (v === "f5_gadis") opt.textContent = "Gadis (F5 Voice Clone - Wanita ID)";
+        else if (v === "f5_ardi") opt.textContent = "Ardi (F5 Voice Clone - Pria ID)";
+        else if (v === "f5_jenny") opt.textContent = "Jenny (F5 Voice Clone - English)";
+        else opt.textContent = v;
+        voiceSelect.appendChild(opt);
+      });
+
+      if (engine === "edge") {
+        voiceSelect.value = "id-ID-GadisNeural";
+      } else if (engine === "f5") {
+        voiceSelect.value = "f5_gadis";
+      } else {
+        voiceSelect.value = "af_sarah";
+      }
+      notifyConfigChange();
+    }
+
+    engineSelect.addEventListener("change", () => {
+      populateVoices(engineSelect.value);
+    });
+
+    voiceSelect.addEventListener("change", () => {
+      notifyConfigChange();
+    });
+
+    async function notifyConfigChange() {
+      try {
+        await fetch("/api/set-voice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            engine: engineSelect.value,
+            voice: voiceSelect.value
+          })
+        });
+      } catch (e) {
+        console.warn("Update voice config error:", e);
+      }
+    }
+
+    // Mode Toggle (Auto vs Push-to-Talk)
+    modeAutoBtn.addEventListener("click", () => {
+      isPushToTalk = false;
+      modeAutoBtn.className = "flex-1 py-1 rounded-lg bg-cyan-500 text-slate-950 font-bold transition";
+      modePttBtn.className = "flex-1 py-1 rounded-lg text-slate-400 hover:text-slate-200 font-medium transition";
+      btnSub.textContent = isListening ? "STOP" : "START";
+    });
+
+    modePttBtn.addEventListener("click", () => {
+      isPushToTalk = true;
+      if (isListening) stopListening();
+      modePttBtn.className = "flex-1 py-1 rounded-lg bg-cyan-500 text-slate-950 font-bold transition";
+      modeAutoBtn.className = "flex-1 py-1 rounded-lg text-slate-400 hover:text-slate-200 font-medium transition";
+      btnSub.textContent = "TAHAN";
+    });
+
+    // Deteksi gema suara speaker di sisi browser
+    function isClientEcho(userText, agentText) {
+      if (!userText || !agentText) return false;
+      const u = userText.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      const a = agentText.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!u || !a) return false;
+      if (u.length >= 6 && (a.includes(u) || u.includes(a))) return true;
+      const uWords = u.split(' ');
+      const aWords = new Set(a.split(' '));
+      if (uWords.length >= 2) {
+        const matches = uWords.filter(w => aWords.has(w)).length;
+        if (matches / uWords.length >= 0.55) return true;
+      }
+      return false;
+    }
+
+    // Inisialisasi Web Speech API
+    if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRec();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        isListening = true;
+        pulseRing.classList.remove("hidden");
+        waveform.classList.remove("hidden");
+        btnIcon.textContent = "⏹️";
+        btnSub.textContent = isPushToTalk ? "LEPAS" : "STOP";
+        toggleVoiceBtn.className = "relative w-24 h-24 rounded-full bg-gradient-to-tr from-red-500 to-rose-600 text-white font-bold flex flex-col items-center justify-center shadow-xl shadow-red-500/30 transition transform active:scale-95 cursor-pointer";
+        statusLabel.innerHTML = `
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+          <span class="text-emerald-300 font-semibold">Mendengarkan... Silakan Bicara!</span>
+        `;
+        previewText.textContent = "Mendengarkan suara Anda...";
+      };
+
+      recognition.onresult = (event) => {
+        // ANTI-LOOP: Abaikan suara saat AI sedang merespons/berbicara
+        if (isAgentSpeaking) {
+          accumulatedText = "";
+          return;
+        }
+
+        let currentInterim = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const trans = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            accumulatedText += " " + trans;
+          } else {
+            currentInterim += trans;
+          }
+        }
+
+        const displayText = (accumulatedText + " " + currentInterim).trim();
+        if (displayText) {
+          const currentAgentResp = agentText.textContent || "";
+          if (isClientEcho(displayText, currentAgentResp)) {
+            previewText.textContent = "🛡️ Gema speaker terdeteksi (diabaikan)";
+            accumulatedText = "";
+            return;
+          }
+
+          previewText.textContent = `"${displayText}"`;
+          sendBadge.classList.add("hidden");
+
+          // Reset silence timer (1.2 detik jeda setelah selesai bicara)
+          clearTimeout(silenceTimer);
+          silenceTimer = setTimeout(() => {
+            const finalSpeech = displayText;
+            if (finalSpeech.length >= 2 && !isAgentSpeaking && finalSpeech !== lastSentText) {
+              if (isClientEcho(finalSpeech, currentAgentResp)) {
+                accumulatedText = "";
+                return;
+              }
+              sendSpeechToTerminal(finalSpeech);
+              accumulatedText = "";
+            }
+          }, 1200);
+        }
+      };
+
+      recognition.onerror = (e) => {
+        if (e.error === "no-speech") return;
+        if (isListening && !isAgentSpeaking) {
+          stopListening();
+        }
+      };
+
+      recognition.onend = () => {
+        if (isListening && !isAgentSpeaking && !isPushToTalk) {
+          try {
+            recognition.start();
+          } catch (e) {
+            stopListening();
+          }
+        }
+      };
+
+    } else {
+      toggleVoiceBtn.disabled = true;
+      statusLabel.innerHTML = `<span class="text-red-400">Browser tidak mendukung Web Speech API.</span>`;
+    }
+
+    function startListening() {
+      if (!recognition || isAgentSpeaking) return;
+      accumulatedText = "";
+      recognition.lang = langSelect.value;
+      try {
+        recognition.start();
+      } catch (e) {}
+    }
+
+    function stopListening() {
+      isListening = false;
+      clearTimeout(silenceTimer);
+      if (recognition) {
+        try { recognition.stop(); } catch (e) {}
+      }
+      pulseRing.classList.add("hidden");
+      waveform.classList.add("hidden");
+      btnIcon.textContent = "🎙️";
+      btnSub.textContent = isPushToTalk ? "TAHAN" : "START";
+      toggleVoiceBtn.className = "relative w-24 h-24 rounded-full bg-gradient-to-tr from-cyan-500 to-emerald-400 hover:from-cyan-400 hover:to-emerald-300 text-slate-950 font-bold flex flex-col items-center justify-center shadow-xl shadow-cyan-500/25 transition transform active:scale-95 cursor-pointer";
+      statusLabel.innerHTML = `
+        <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+        <span>Mode Suara Standby - Klik START untuk bicara</span>
+      `;
+    }
+
+    // Toggle button handler
+    toggleVoiceBtn.addEventListener("click", () => {
+      if (isPushToTalk) return;
+      if (isListening) {
+        stopListening();
+      } else {
+        startListening();
+      }
+    });
+
+    // Push to Talk (Hold)
+    toggleVoiceBtn.addEventListener("mousedown", () => {
+      if (!isPushToTalk) return;
+      startListening();
+    });
+    window.addEventListener("mouseup", () => {
+      if (!isPushToTalk || !isListening) return;
+      setTimeout(() => {
+        const text = accumulatedText.trim();
+        stopListening();
+        if (text.length >= 2 && text !== lastSentText) {
+          const currentAgentResp = agentText.textContent || "";
+          if (isClientEcho(text, currentAgentResp)) {
+            accumulatedText = "";
+            return;
+          }
+          sendSpeechToTerminal(text);
+          accumulatedText = "";
+        }
+      }, 300);
+    });
+
+    // Kirim teks hasil STT ke Backend Terminal dengan Proteksi Echo Loop Penuh
+    async function sendSpeechToTerminal(text) {
+      const currentAgent = agentText.textContent || "";
+      if (isClientEcho(text, currentAgent)) {
+        previewText.textContent = "🛡️ Gema speaker terdeteksi (tidak dikirim)";
+        return;
+      }
+
+      lastSentText = text;
+      isAgentSpeaking = true;
+
+      // Segera matikan mic agar tidak mendengar speaker
+      if (recognition) {
+        try { recognition.abort(); } catch (e) {}
+      }
+      
+      pulseRing.classList.add("hidden");
+      waveform.classList.add("hidden");
+      statusLabel.innerHTML = `
+        <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span class="text-amber-300 font-semibold">🔊 AI Berpikir & Berbicara (Mic Dijeda Otomatis)</span>
+      `;
+      sendBadge.classList.remove("hidden");
+      sendBadge.textContent = "Terkirim ke Terminal ✓";
+
+      // Tampilkan seketika di widget terminal web (persis seperti text.png)
+      promptSource.textContent = "[VOICE]";
+      promptText.textContent = text;
+      promptText.classList.remove("italic");
+      agentText.textContent = "Sedang menghasilkan respons...";
+
+      try {
+        const res = await fetch("/api/submit-speech", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: text,
+            engine: engineSelect.value,
+            voice: voiceSelect.value
+          })
+        });
+
+        const data = await res.json();
+        if (data.status === "echo_ignored" || data.status === "busy") {
+          sendBadge.classList.remove("hidden");
+          sendBadge.textContent = "🛡️ " + (data.message || "Gema diabaikan");
+          isAgentSpeaking = false;
+          return;
+        }
+
+        // Pantau status audio dan streaming hingga selesai
+        startAudioPlaybackWatcher();
+
+      } catch (err) {
+        sendBadge.textContent = "Gagal kirim: " + err.message;
+        isAgentSpeaking = false;
+      }
+    }
+
+    // Polling background untuk mendeteksi kapan audio & streaming AI selesai
+    function startAudioPlaybackWatcher() {
+      clearInterval(pollAudioTimer);
+      let confirmedBusyOrPlaying = false;
+      let idleCount = 0;
+
+      pollAudioTimer = setInterval(async () => {
+        try {
+          const res = await fetch("/api/playback-status");
+          const data = await res.json();
+
+          // Sinkronkan teks jawaban streaming agent di layar terminal web
+          if (data.latest_chat && data.latest_chat.agent) {
+            agentText.textContent = data.latest_chat.agent;
+          }
+
+          if (data.is_playing || data.agent_busy) {
+            confirmedBusyOrPlaying = true;
+            idleCount = 0;
+          } else {
+            if (confirmedBusyOrPlaying) {
+              idleCount++;
+            }
+          }
+
+          // Butuh minimal 2 kali konfirmasi idle berturut-turut setelah sesi aktif
+          if (confirmedBusyOrPlaying && idleCount >= 2) {
+            clearInterval(pollAudioTimer);
+            
+            // Jeda 1200ms agar gema ruangan benar-benar hilang sebelum mic aktif kembali
+            setTimeout(() => {
+              isAgentSpeaking = false;
+              statusLabel.innerHTML = `
+                <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                <span>Mode Suara Standby - Siap menerima input berikutnya</span>
+              `;
+              if (!isPushToTalk && isListening) {
+                startListening();
+              } else {
+                stopListening();
+              }
+            }, 1200);
+          }
+        } catch (e) {
+          clearInterval(pollAudioTimer);
+          isAgentSpeaking = false;
+        }
+      }, 350);
+    }
+
+    // Tombol Hentikan Suara TTS
+    stopAudioBtn.addEventListener("click", async () => {
+      try {
+        await fetch("/api/stop-audio", { method: "POST" });
+        clearInterval(pollAudioTimer);
+        isAgentSpeaking = false;
+        statusLabel.innerHTML = `
+          <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+          <span>Suara telah dihentikan.</span>
+        `;
+        if (isListening && !isPushToTalk) {
+          startListening();
+        }
+      } catch (e) {
+        alert("Gagal menghentikan audio: " + e.message);
+      }
+    });
+
+    // Tombol Matikan Aplikasi (Shutdown App)
+    stopAppBtn.addEventListener("click", async () => {
+      if (!confirm("Apakah Anda yakin ingin mematikan aplikasi Terminal Voice Chat dan menutup server?")) {
+        return;
+      }
+      try {
+        stopListening();
+        clearInterval(pollAudioTimer);
+        await fetch("/api/stop-app", { method: "POST" });
+        document.body.innerHTML = `
+          <div class="text-center p-8 bg-slate-900 border border-slate-800 rounded-3xl max-w-sm shadow-2xl">
+            <div class="text-5xl mb-4">🛑</div>
+            <h2 class="text-lg font-bold text-slate-100">Aplikasi Berhasil Dimatikan</h2>
+            <p class="text-xs text-slate-400 mt-2">Server dan proses terminal telah dinonaktifkan. Anda dapat menutup halaman ini.</p>
+          </div>
+        `;
+      } catch (e) {
+        alert("Gagal mematikan aplikasi: " + e.message);
+      }
+    });
+
+    // Inisialisasi awal
+    initConfig();
+  </script>
+</body>
+</html>

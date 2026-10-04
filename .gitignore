@@ -1,0 +1,23 @@
+# Python virtual environments & bytecode
+.venv/
+env/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Models and Large weights (download via download_models.sh)
+models/*
+!models/.gitkeep
+
+# Temporary audio files
+tmp_audio/*
+!tmp_audio/.gitkeep
+*.mp3
+*.wav
+!voices_f5/*.wav
+
+# Logs & Environment
+*.log
+.env
+.DS_Store
